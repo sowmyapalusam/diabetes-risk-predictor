@@ -25,7 +25,7 @@ def get_models():
 try:
     random_forest, decision_tree, metrics, importance = get_models()
 except Exception as exc:
-    st.error("The model could not be initialized.")
+   st.error(f"The model could not be initialized: {exc}")
     st.caption("Check the deployment logs and network access to the public dataset.")
     st.stop()
 
