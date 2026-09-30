@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diabetes Risk Predictor</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--tx:#1f2937;--mu:#6b7280;--bd:#e2e8f0;--ac:#2563eb;--g:#1e8e3e;--y:#f9ab00;--r:#d93025;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--card:#1e293b;--tx:#e5e7eb;--mu:#94a3b8;--bd:#334155;--ac:#60a5fa}}
+:root[data-theme="dark"]{--bg:#0f172a;--card:#1e293b;--tx:#e5e7eb;--mu:#94a3b8;--bd:#334155;--ac:#60a5fa}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:18px 20px 6px;max-width:1150px;margin:auto}
+h1{margin:0;font-size:24px}.sub{color:var(--mu);font-size:13px}
+.wrap{max-width:1150px;margin:auto;padding:12px 20px 30px;display:grid;grid-template-columns:310px 1fr;gap:16px}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+.card h2{margin:0 0 10px;font-size:16px}
+.f{margin-bottom:11px}.f label{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+.f input[type=range]{width:100%;accent-color:var(--ac)}
+.na{font-size:12px;color:var(--mu);font-weight:400;display:flex;gap:4px;align-items:center}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:7px 12px}
+button.p{background:var(--ac);color:#fff;border:0;width:100%;padding:11px;font-weight:600;margin-top:6px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.banner{font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;background:rgba(249,171,0,.15);border:1px solid var(--y)}
+.banner.ok{background:rgba(30,142,60,.13);border-color:var(--g)}
+.big{font-size:44px;font-weight:700;line-height:1}
+.bar{height:22px;border-radius:11px;background:linear-gradient(90deg,var(--g),var(--y) 55%,var(--r));position:relative;margin:14px 0 4px}
+.bar i{position:absolute;top:-6px;width:6px;height:34px;background:var(--tx);border-radius:3px;transform:translateX(-50%);transition:left .5s}
+.sc{display:flex;justify-content:space-between;font-size:12px;color:var(--mu)}
+.m{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+.m div{border:1px solid var(--bd);border-radius:10px;padding:10px}.m b{display:block;font-size:22px}.m span{font-size:12px;color:var(--mu)}
+.ib{display:grid;grid-template-columns:150px 1fr 44px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+.ib s{height:12px;background:var(--ac);border-radius:6px;display:block;text-decoration:none}
+table{border-collapse:collapse;font-size:13px}td,th{border:1px solid var(--bd);padding:6px 12px;text-align:center}
+.mu{color:var(--mu);font-size:13px}.hide{display:none}
+footer{max-width:1150px;margin:auto;padding:0 20px 24px;font-size:12px;color:var(--mu)}
+</style></head><body>
+<header><h1>🩺 Diabetes Risk Predictor</h1>
+<div class="sub">Random Forest prototype running entirely in your browser · educational screening aid</div></header>
+<div class="wrap">
+<aside class="card"><h2>Patient Information</h2>
+<div style="display:flex;gap:6px;margin-bottom:12px"><button id="lo" style="flex:1">Low-risk example</button><button id="hi" style="flex:1">High-risk example</button></div>
+<div id="inputs"></div>
+<button class="p" id="go">🔍 Predict Risk</button>
+<p class="mu" style="margin-bottom:0">Tick “n/a” if a value wasn’t measured; the model fills it with the training median.</p></aside>
+<main>
+<div id="bn" class="banner">Training model…</div>
+<div class="tabs"><button class="on" data-t="t1">📊 Prediction</button><button data-t="t2">🧠 Model Information</button></div>
+<section id="t1">
+<div class="card" id="res"><p class="mu" style="margin:0">Enter patient details and press <b>Predict Risk</b>.</p></div>
+<div class="card" style="margin-top:12px"><h2>What drives the model</h2><div id="ib1"></div></div>
+</section>
+<section id="t2" class="hide">
+<div class="card"><h2>Performance (held-out 20% test set)</h2><div class="m" id="mets"></div>
+<div style="display:flex;gap:24px;flex-wrap:wrap"><div><h2>Confusion matrix</h2><table id="cm"></table></div>
+<div style="flex:1;min-width:230px"><h2>Model details</h2><div class="mu" id="det"></div></div></div></div>
+<div class="card" style="margin-top:12px"><h2>Feature importance</h2><div id="ib2"></div></div>
+<div class="card" style="margin-top:12px"><h2>Use the real dataset</h2>
+<p class="mu" style="margin-top:0">Load the Pima Indians <code>diabetes.csv</code> (columns: Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, DiabetesPedigreeFunction, Age, Outcome) to retrain on real data.</p>
+<input type="file" id="csv" accept=".csv"></div>
+</section></main></div>
+<footer>⚠️ <b>Medical disclaimer:</b> educational demonstration only. Not a medical device and not a diagnosis. Consult a qualified healthcare professional.</footer>
+<script>
+const F=["Pregnancies","Glucose","BloodPressure","SkinThickness","Insulin","BMI","DiabetesPedigreeFunction","Age"];
+const CFG=[["Pregnancies",0,20,2,1,0],["Glucose (mg/dL)",40,250,120,1,1],["Blood Pressure (mm Hg)",20,140,70,1,1],["Skin Thickness (mm)",5,100,20,1,1],["Insulin (µU/mL)",10,900,80,1,1],["BMI (kg/m²)",10,70,28,.1,1],["Diabetes Pedigree Fn",.05,2.5,.4,.01,0],["Age (years)",18,90,35,1,0]];
+const $=s=>document.querySelector(s),zc=j=>j>=1&&j<=5;
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+/* ---------- inputs ---------- */
+$('#inputs').innerHTML=CFG.map((c,i)=>`<div class="f"><label><span>${c[0]}</span><span>${c[5]?`<span class="na"><input type="checkbox" id="n${i}">n/a</span>`:''}</span></label>
+<div style="display:flex;gap:8px;align-items:center"><input type="range" id="r${i}" min="${c[1]}" max="${c[2]}" step="${c[4]}" value="${c[3]}"><b id="v${i}" style="min-width:42px;text-align:right">${c[3]}</b></div></div>`).join('');
+CFG.forEach((c,i)=>{$('#r'+i).oninput=e=>$('#v'+i).textContent=e.target.value;if(c[5])$('#n'+i).onchange=e=>{$('#r'+i).disabled=e.target.checked;$('#v'+i).style.opacity=e.target.checked?.3:1}});
+function setVals(a){a.forEach((v,i)=>{$('#r'+i).value=v;$('#v'+i).textContent=v;if(CFG[i][5]){$('#n'+i).checked=false;$('#r'+i).disabled=false;$('#v'+i).style.opacity=1}})}
+$('#lo').onclick=()=>setVals([1,95,68,22,70,23.5,.2,26]);
+$('#hi').onclick=()=>setVals([6,168,80,35,190,38.5,.9,52]);
+/* ---------- data ---------- */
+function synth(){const r=rng(7),n=()=>Math.sqrt(-2*Math.log(r()+1e-12))*Math.cos(6.2832*r()),c=(v,a,b)=>Math.min(b,Math.max(a,v)),rows=[];
+for(let i=0;i<768;i++){const p=c(Math.round(3.8+3.3*n()),0,17),g=c(121+32*n(),44,199),bp=c(69+15*n(),40,122),sk=c(21+12*n(),7,99),ins=c(Math.exp(4.5+.7*n()),14,846),bmi=c(32+7*n(),18,67),d=c(Math.exp(-1+.7*n()),.08,2.4),a=c(Math.round(Math.exp(3.5+.3*Math.abs(n()))),21,81);
+const z=(.035*(g-120)+.07*(bmi-32)+.03*(a-33)+d+.08*p-1)/1.6,y=r()<1/(1+Math.exp(-z))?1:0,row=[p,g,bp,sk,ins,bmi,d,a,y];
+if(r()<.01)row[1]=0;if(r()<.05)row[2]=0;if(r()<.25)row[3]=0;if(r()<.4)row[4]=0;if(r()<.01)row[5]=0;rows.push(row)}return rows}
+function parseCSV(t){const L=t.trim().split(/\r?\n/).map(l=>l.split(',')),h=L[0].map(s=>s.trim().replace(/"/g,'')),ix=[...F,'Outcome'].map(k=>h.indexOf(k));
+if(ix.includes(-1))throw Error('Missing required columns');const rows=L.slice(1).map(r=>ix.map(i=>parseFloat(r[i]))).filter(r=>r.every(v=>!isNaN(v)));
+if(rows.length<50)throw Error('Too few valid rows');return rows}
+/* ---------- random forest ---------- */
+function fitRF(X,y,T=60,depth=7,leaf=3){const n=X.length,p=8,n1=y.reduce((a,b)=>a+b,0),w=[n/(2*(n-n1)),n/(2*n1)],R=rng(42),imp=Array(p).fill(0);
+function build(idx,d){let a=0,b=0;for(const i of idx)y[i]?b+=w[1]:a+=w[0];const tot=a+b,nd={p:b/tot};
+if(d>=depth||idx.length<2*leaf||!a||!b)return nd;const gi=1-(a*a+b*b)/(tot*tot);let best=null;
+for(const f of [...Array(p).keys()].sort(()=>R()-.5).slice(0,3)){const s=idx.slice().sort((i,j)=>X[i][f]-X[j][f]);let la=0,lb=0;
+for(let k=0;k<s.length-1;k++){y[s[k]]?lb+=w[1]:la+=w[0];if(k+1<leaf||s.length-k-1<leaf||X[s[k]][f]===X[s[k+1]][f])continue;
+const ra=a-la,rb=b-lb,lt=la+lb,rt=ra+rb,g=(lt*(1-(la*la+lb*lb)/(lt*lt))+rt*(1-(ra*ra+rb*rb)/(rt*rt)))/tot,gain=gi-g;
+if(!best||gain>best.gain)best={gain,f,t:(X[s[k]][f]+X[s[k+1]][f])/2}}}
+if(!best||best.gain<=0)return nd;imp[best.f]+=best.gain*tot;const L=[],Rr=[];for(const i of idx)(X[i][best.f]<=best.t?L:Rr).push(i);
+nd.f=best.f;nd.t=best.t;nd.l=build(L,d+1);nd.r=build(Rr,d+1);return nd}
+const trees=[];for(let t=0;t<T;t++)trees.push(build(Array.from({length:n},()=>Math.floor(R()*n)),0));
+const s=imp.reduce((a,b)=>a+b,0)||1;return{trees,imp:imp.map(v=>v/s)}}
+function proba(m,x){let s=0;for(const t of m.trees){let nd=t;while(nd.l)nd=x[nd.f]<=nd.t?nd.l:nd.r;s+=nd.p}return s/m.trees.length}
+/* ---------- train / evaluate ---------- */
+let M,MED,INFO;
+const fx=x=>x.slice(0,8).map((v,j)=>zc(j)&&!(v>0)?MED[j]:v);
+function train(rows,real){const r=rng(1),sh=rows.slice().sort(()=>r()-.5),nt=Math.round(sh.length*.2),te=sh.slice(0,nt),tr=sh.slice(nt);
+MED=F.map((_,j)=>{const v=tr.map(x=>x[j]).filter(v=>zc(j)?v>0:true).sort((a,b)=>a-b);return v[v.length>>1]});
+M=fitRF(tr.map(fx),tr.map(x=>x[8]));let tp=0,fp=0,tn=0,fn=0;
+te.forEach(x=>{const p=proba(M,fx(x))>=.5,a=x[8]==1;p&&a?tp++:p?fp++:a?fn++:tn++});
+const prec=tp/(tp+fp||1),rec=tp/(tp+fn||1);
+INFO={real,n:rows.length,ntr:tr.length,nte:te.length,pos:rows.filter(x=>x[8]).length/rows.length,acc:(tp+tn)/te.length,prec,rec,f1:2*prec*rec/(prec+rec||1),cm:[tn,fp,fn,tp]};render()}
+const pc=v=>(v*100).toFixed(1)+'%';
+function bars(){const o=F.map((f,i)=>[f,M.imp[i]]).sort((a,b)=>b[1]-a[1]),mx=o[0][1];
+return o.map(([f,v])=>`<div class="ib"><span>${f}</span><s style="width:${v/mx*100}%"></s><span>${(v*100).toFixed(0)}%</span></div>`).join('')}
+function render(){const i=INFO;$('#bn').className='banner'+(i.real?' ok':'');
+$('#bn').innerHTML=i.real?`✅ Trained on your uploaded dataset (${i.n} records).`:`⚠️ Using <b>synthetic demo data</b> (${i.n} records). Upload the real <code>diabetes.csv</code> in the Model Information tab for real results.`;
+$('#mets').innerHTML=[['Accuracy',pc(i.acc)],['Precision',pc(i.prec)],['Recall',pc(i.rec)],['F1 score',pc(i.f1)]].map(([k,v])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
+$('#cm').innerHTML=`<tr><th></th><th>Pred: No</th><th>Pred: Yes</th></tr><tr><th>Actual: No</th><td>${i.cm[0]}</td><td>${i.cm[1]}</td></tr><tr><th>Actual: Yes</th><td>${i.cm[2]}</td><td>${i.cm[3]}</td></tr>`;
+$('#det').innerHTML=`<b>Algorithm:</b> Random Forest, 60 trees, depth ≤ 7, balanced class weights<br><b>Data:</b> ${i.n} records, ${(i.pos*100).toFixed(0)}% diabetic<br><b>Split:</b> ${i.ntr} train / ${i.nte} test (80/20)<br><b>Missing values:</b> zeros in Glucose, BP, Skin, Insulin, BMI treated as missing, median-imputed`;
+$('#ib1').innerHTML=$('#ib2').innerHTML=bars()}
+/* ---------- predict ---------- */
+$('#go').onclick=()=>{const x=CFG.map((c,i)=>c[5]&&$('#n'+i).checked?NaN:+$('#r'+i).value),p=proba(M,fx(x)),hi=p>=.5,col=p>=.65?'var(--r)':hi?'var(--y)':'var(--g)',miss=F.filter((_,i)=>isNaN(x[i]));
+$('#res').innerHTML=`<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center"><div><div class="mu">Risk probability</div><div class="big">${Math.round(p*100)}%</div></div>
+<div style="font-size:20px;font-weight:700;color:${col}">${hi?'HIGHER':'LOWER'} predicted risk</div></div>
+<div class="bar"><i style="left:${p*100}%"></i></div><div class="sc"><span>Low</span><span>Moderate</span><span>High</span></div>
+${miss.length?`<p class="mu" style="margin-bottom:0">Estimated (median-imputed): ${miss.join(', ')}</p>`:''}`};
+/* ---------- tabs & upload ---------- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x==b));['t1','t2'].forEach(t=>$('#'+t).classList.toggle('hide',t!=b.dataset.t))});
+$('#csv').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{$('#bn').textContent='Training…';setTimeout(()=>train(parseCSV(r.result),true),20)}catch(err){alert('Could not load CSV: '+err.message)}};r.readAsText(f)};
+setTimeout(()=>train(synth(),false),30);
+</script></body></html>
