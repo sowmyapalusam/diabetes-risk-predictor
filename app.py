@@ -1,104 +1,96 @@
-import pandas as pd
+"""Streamlit user interface for the Early Diabetes Risk Predictor."""
+from __future__ import annotations
+
 import streamlit as st
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score
 
-st.set_page_config(page_title="Diabetes Risk Predictor", page_icon="🩺", layout="centered")
+from model import FEATURE_NAMES, predict_risk, train_models
 
-DATA_URL = "https://raw.githubusercontent.com/npradaschnor/Pima-Indians-Diabetes-Dataset/master/diabetes.csv"
-
-FEATURES = [
-    "Pregnancies", "Glucose", "BloodPressure", "SkinThickness",
-    "Insulin", "BMI", "DiabetesPedigreeFunction", "Age"
-]
-
-@st.cache_resource
-def train_models():
-    df = pd.read_csv(DATA_URL)
-
-    # In this dataset, zero values in these measurements are treated as missing.
-    missing_as_zero = ["Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI"]
-    df[missing_as_zero] = df[missing_as_zero].replace(0, pd.NA)
-
-    X = df[FEATURES]
-    y = df["Outcome"]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=42, stratify=y
-    )
-
-    imputer = SimpleImputer(strategy="median")
-
-    rf = Pipeline([
-        ("imputer", imputer),
-        ("model", RandomForestClassifier(
-            n_estimators=250, random_state=42, class_weight="balanced"
-        ))
-    ])
-
-    dt = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("model", DecisionTreeClassifier(
-            random_state=42, max_depth=5, class_weight="balanced"
-        ))
-    ])
-
-    rf.fit(X_train, y_train)
-    dt.fit(X_train, y_train)
-
-    rf_acc = accuracy_score(y_test, rf.predict(X_test))
-    dt_acc = accuracy_score(y_test, dt.predict(X_test))
-
-    return rf, dt, rf_acc, dt_acc
+st.set_page_config(
+    page_title="Diabetes Risk Predictor",
+    page_icon="🩺",
+    layout="centered",
+)
 
 st.title("🩺 Early Diabetes Risk Predictor")
-st.write("A machine-learning prototype that estimates diabetes risk from basic health parameters.")
+st.caption(
+    "Machine-learning screening prototype using basic health parameters. "
+    "It is not a medical diagnosis."
+)
 
-with st.spinner("Preparing the machine-learning models..."):
-    rf, dt, rf_acc, dt_acc = train_models()
+@st.cache_resource(show_spinner=False)
+def get_models():
+    """Train and cache the two classifiers used by the application."""
+    return train_models()
 
-st.sidebar.header("Enter Health Details")
+try:
+    random_forest, decision_tree, metrics, importance = get_models()
+except Exception as exc:
+    st.error("The model could not be initialized.")
+    st.caption("Check the deployment logs and network access to the public dataset.")
+    st.stop()
 
-pregnancies = st.sidebar.number_input("Pregnancies", min_value=0, max_value=20, value=1)
-glucose = st.sidebar.number_input("Glucose (mg/dL)", min_value=1.0, max_value=300.0, value=120.0)
-blood_pressure = st.sidebar.number_input("Blood Pressure (mmHg)", min_value=1.0, max_value=200.0, value=70.0)
-skin_thickness = st.sidebar.number_input("Skin Thickness (mm)", min_value=1.0, max_value=100.0, value=20.0)
-insulin = st.sidebar.number_input("Insulin (µU/mL)", min_value=1.0, max_value=900.0, value=80.0)
-bmi = st.sidebar.number_input("BMI", min_value=1.0, max_value=70.0, value=25.0)
-pedigree = st.sidebar.number_input("Diabetes Pedigree Function", min_value=0.0, max_value=3.0, value=0.47)
-age = st.sidebar.number_input("Age (years)", min_value=1, max_value=120, value=30)
+st.sidebar.header("Patient Inputs")
+st.sidebar.caption("Enter values available from a routine health assessment.")
 
-input_df = pd.DataFrame([{
-    "Pregnancies": pregnancies,
-    "Glucose": glucose,
-    "BloodPressure": blood_pressure,
-    "SkinThickness": skin_thickness,
-    "Insulin": insulin,
-    "BMI": bmi,
-    "DiabetesPedigreeFunction": pedigree,
-    "Age": age
-}])
-
-st.subheader("Prediction")
+values = {}
+values["Pregnancies"] = st.sidebar.number_input(
+    "Pregnancies", min_value=0.0, max_value=20.0, value=1.0, step=1.0
+)
+values["Glucose"] = st.sidebar.number_input(
+    "Glucose (mg/dL)", min_value=0.0, max_value=300.0, value=120.0, step=1.0
+)
+values["BloodPressure"] = st.sidebar.number_input(
+    "Blood Pressure (mmHg)", min_value=0.0, max_value=200.0, value=70.0, step=1.0
+)
+values["SkinThickness"] = st.sidebar.number_input(
+    "Skin Thickness (mm)", min_value=0.0, max_value=100.0, value=20.0, step=1.0
+)
+values["Insulin"] = st.sidebar.number_input(
+    "Insulin (µU/mL)", min_value=0.0, max_value=900.0, value=80.0, step=1.0
+)
+values["BMI"] = st.sidebar.number_input(
+    "BMI", min_value=0.0, max_value=70.0, value=25.0, step=0.1
+)
+values["DiabetesPedigreeFunction"] = st.sidebar.number_input(
+    "Diabetes Pedigree Function", min_value=0.0, max_value=3.0, value=0.47, step=0.01
+)
+values["Age"] = st.sidebar.number_input(
+    "Age (years)", min_value=1.0, max_value=120.0, value=30.0, step=1.0
+)
 
 if st.button("Predict Diabetes Risk", type="primary", use_container_width=True):
-    probability = rf.predict_proba(input_df)[0][1]
-    prediction = int(rf.predict(input_df)[0])
+    result = predict_risk(random_forest, values)
 
-    if prediction == 1:
-        st.warning(f"⚠️ Higher predicted risk ({probability:.1%})")
-        st.write("The model identifies a higher-risk pattern in the entered values.")
+    st.subheader("Prediction")
+    probability = result["probability"]
+
+    if result["risk"] == "Higher predicted risk":
+        st.warning(f"⚠️ {result['risk']} — model probability: {probability:.1%}")
     else:
-        st.success(f"✅ Lower predicted risk ({probability:.1%})")
-        st.write("The model identifies a lower-risk pattern in the entered values.")
+        st.success(f"✅ {result['risk']} — model probability: {probability:.1%}")
 
-    st.info("This is a machine-learning screening prototype, not a medical diagnosis. Consult a qualified healthcare professional for clinical evaluation.")
+    st.info(
+        "This result is a screening estimate from a machine-learning model. "
+        "It should not be used to diagnose diabetes or replace professional medical advice."
+    )
 
-with st.expander("Model information"):
-    st.write(f"Random Forest test accuracy: **{rf_acc:.1%}**")
-    st.write(f"Decision Tree test accuracy: **{dt_acc:.1%}**")
-    st.write("The models use the Pima Indians Diabetes dataset and median imputation for missing values. Results depend on the dataset and should not be interpreted as clinical accuracy.")
+with st.expander("Model validation"):
+    st.write(
+        f"Random Forest accuracy: **{metrics['random_forest_accuracy']:.1%}**"
+    )
+    st.write(
+        f"Decision Tree accuracy: **{metrics['decision_tree_accuracy']:.1%}**"
+    )
+    st.write(
+        f"Validation samples: **{metrics['validation_samples']}**"
+    )
+
+with st.expander("Key model features"):
+    for feature, score in list(importance.items())[:5]:
+        st.write(f"**{feature}** — {score:.3f}")
+
+st.divider()
+st.caption(
+    "Dataset: Pima Indians Diabetes dataset. Values such as zero measurements "
+    "for selected clinical fields are treated as missing during preprocessing."
+)
