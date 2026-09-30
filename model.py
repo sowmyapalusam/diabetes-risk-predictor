@@ -15,10 +15,9 @@ from sklearn.tree import DecisionTreeClassifier
 from urllib.request import Request, urlopen
 
 DATA_URL = (
-    "https://raw.githubusercontent.com/npradaschnor/"
-    "Pima-Indians-Diabetes-Dataset/master/diabetes.csv"
+    "https://github.com/npradaschnor/"
+    "Pima-Indians-Diabetes-Dataset/raw/refs/heads/master/diabetes.csv"
 )
-
 FEATURE_NAMES = [
     "Pregnancies",
     "Glucose",
